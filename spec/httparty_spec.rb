@@ -1,5 +1,11 @@
 require File.expand_path(File.join(File.dirname(__FILE__), 'spec_helper'))
 
+class CustomParser
+  def self.parse(body, options={})
+    return {:sexy => true}
+  end
+end
+
 describe HTTParty do
   before(:each) do
     @klass = Class.new
@@ -152,6 +158,28 @@ describe HTTParty do
     end
   end
   
+  describe "parser" do
+    before(:each) do
+      @klass.parser Proc.new{|data| CustomParser.parse(data)}
+    end
+    it "should set parser options" do
+      @klass.default_options[:parser].class.should == Proc
+    end
+    
+    it "should be able parse response with custom parser" do
+      data = file_fixture('twitter.xml')
+
+      response = Net::HTTPOK.new("1.1", 200, "Content for you")
+      response.stub!(:body).and_return(data)
+
+      http_request = HTTParty::Request.new(Net::HTTP::Get, 'http://localhost', :format => :xml)
+      http_request.stub!(:perform_actual_request).and_return(response)
+            
+      custom_parsed_response = @klass.get('http://twitter.com/statuses/public_timeline.xml')
+      custom_parsed_response[:sexy].should == true
+    end
+  end
+  
   describe "format" do
     it "should allow xml" do
       @klass.format :xml
@@ -274,6 +302,7 @@ describe HTTParty do
         "location"          => nil
       }
     end
+    
     
     it "should not get undefined method add_node for nil class for the following xml" do
       stub_http_response_with('undefined_method_add_node_for_nil.xml')
